@@ -14,8 +14,6 @@
     <Folder Include="Features\Alerts\" />
     <Folder Include="Features\StatusPages\" />
     <Folder Include="Features\Services\" />
-    <Folder Include="Interfaces\" />
-    <Folder Include="DTOs\" />
     <Folder Include="Behaviors\" />
   </ItemGroup>
 

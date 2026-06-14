@@ -1,4 +1,4 @@
-﻿namespace ApiPulseHQ.Api.Models.Auth
+﻿namespace ApiPulseHQ.Application.DTOs.Auth
 {
     public class TokenResponse
     {

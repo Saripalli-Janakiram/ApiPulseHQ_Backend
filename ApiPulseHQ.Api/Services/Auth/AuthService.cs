@@ -1,4 +1,5 @@
-﻿using ApiPulseHQ.Api.Models.Auth;
+﻿using ApiPulseHQ.Application.Interfaces;
+using ApiPulseHQ.Application.DTOs.Auth;
 using ApiPulseHQ.Domain.Entities;
 using ApiPulseHQ.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +24,10 @@ namespace ApiPulseHQ.Api.Services.Auth
             _config = config;
         }
 
-        public async Task<AuthResult> RegisterAsync(RegisterRequest request)
+        // -----------------------------
+        // REGISTER
+        // -----------------------------
+        public async Task<AuthResult> RegisterAsync(RegisterRequestDto request)
         {
             var email = request.Email.Trim().ToLower();
 
@@ -43,7 +47,10 @@ namespace ApiPulseHQ.Api.Services.Auth
             return AuthResult.SuccessResult();
         }
 
-        public async Task<AuthResult> LoginAsync(LoginRequest request)
+        // -----------------------------
+        // LOGIN
+        // -----------------------------
+        public async Task<AuthResult> LoginAsync(LoginRequestDto request)
         {
             var email = request.Email.Trim().ToLower();
 
@@ -63,6 +70,9 @@ namespace ApiPulseHQ.Api.Services.Auth
             return AuthResult.SuccessResult(tokens);
         }
 
+        // -----------------------------
+        // REFRESH TOKEN
+        // -----------------------------
         public async Task<AuthResult> RefreshTokenAsync(string refreshToken)
         {
             var user = await _db.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
@@ -79,6 +89,93 @@ namespace ApiPulseHQ.Api.Services.Auth
             return AuthResult.SuccessResult(tokens);
         }
 
+        // -----------------------------
+        // GET CURRENT USER (/auth/me)
+        // -----------------------------
+        public async Task<UserProfileResponse> GetCurrentUserAsync(Guid userId)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                throw new Exception("User not found");
+
+            return new UserProfileResponse
+            {
+                Id = user.Id,
+                Email = user.Email,
+                CreatedAt = user.CreatedAt
+            };
+        }
+
+        // -----------------------------
+        // LOGOUT (/auth/logout)
+        // -----------------------------
+        public async Task LogoutAsync(Guid userId)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return;
+
+            user.RefreshToken = null;
+            user.RefreshTokenExpiry = null;
+
+            await _db.SaveChangesAsync();
+        }
+
+        // -----------------------------
+        // FORGOT PASSWORD
+        // -----------------------------
+        public async Task ForgotPasswordAsync(ForgotPasswordRequestDto request)
+        {
+            var email = request.Email.Trim().ToLower();
+
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null)
+                return; // Do not reveal user existence
+
+            user.PasswordResetToken = Guid.NewGuid().ToString("N");
+            user.PasswordResetExpiry = DateTime.UtcNow.AddHours(1);
+
+            await _db.SaveChangesAsync();
+
+            await SendPasswordResetEmailStub(user.Email, user.PasswordResetToken);
+        }
+
+        // -----------------------------
+        // RESET PASSWORD
+        // -----------------------------
+        public async Task ResetPasswordAsync(ResetPasswordRequestDto request)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u =>
+                u.PasswordResetToken == request.Token &&
+                u.PasswordResetExpiry > DateTime.UtcNow);
+
+            if (user == null)
+                throw new Exception("Invalid or expired password reset token");
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetExpiry = null;
+
+            user.RefreshToken = null;
+            user.RefreshTokenExpiry = null;
+
+            await _db.SaveChangesAsync();
+        }
+
+        // -----------------------------
+        // EMAIL STUB
+        // -----------------------------
+        private Task SendPasswordResetEmailStub(string email, string token)
+        {
+            Console.WriteLine($"[EMAIL STUB] Password reset token for {email}: {token}");
+            return Task.CompletedTask;
+        }
+
+        // -----------------------------
+        // GENERATE TOKENS
+        // -----------------------------
         private TokenResponse GenerateTokens(User user)
         {
             var jwtSection = _config.GetSection("Jwt");

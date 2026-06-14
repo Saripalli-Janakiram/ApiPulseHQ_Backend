@@ -3,8 +3,9 @@ using ApiPulseHQ.Api.Services.Email;
 using ApiPulseHQ.Api.Services.Monitoring;
 using ApiPulseHQ.Api.Services.PublicStatusPage;
 using ApiPulseHQ.Api.Services.ServiceEndpoints;
-using ApiPulseHQ.Api.Services.StatusPages;   // ✔ KEEP THIS
+using ApiPulseHQ.Api.Services.StatusPages;
 using ApiPulseHQ.Api.Workers;
+using ApiPulseHQ.Application.Interfaces;
 using ApiPulseHQ.Infrastructure.Persistence;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -19,7 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 // --------------------------------------
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();   // ✔ Works with Swashbuckle 6.6.2
+builder.Services.AddSwaggerGen();
 
 // --------------------------------------
 // DbContext
@@ -61,9 +62,8 @@ builder.Services.AddAuthorization();
 // --------------------------------------
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IServiceEndpointsService, ServiceEndpointsService>();
-builder.Services.AddScoped<IStatusPagesService, StatusPagesService>();   // ✔ Correct namespace
+builder.Services.AddScoped<IStatusPagesService, StatusPagesService>();
 builder.Services.AddScoped<IPublicStatusPageService, PublicStatusPageService>();
-
 builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
 
@@ -80,15 +80,15 @@ var app = builder.Build();
 // --------------------------------------
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();       // ✔ No OpenAPI errors now
-    app.UseSwaggerUI();
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "ApiPulseHQ v1");
+        c.RoutePrefix = "swagger";
+    });
 }
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "ApiPulseHQ v1");
-    c.RoutePrefix = "swagger";
-});
-// app.UseHttpsRedirection();
+
+app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
