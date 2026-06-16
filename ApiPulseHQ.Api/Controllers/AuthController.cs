@@ -3,6 +3,7 @@ using ApiPulseHQ.Application.DTOs.Auth;
 using ApiPulseHQ.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ApiPulseHQ.Infrastructure.Persistence;        
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -14,10 +15,11 @@ namespace ApiPulseHQ.Api.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
-
-        public AuthController(IAuthService authService)
+        private readonly ApiPulseDbContext _db;
+        public AuthController(IAuthService authService, ApiPulseDbContext db)
         {
             _authService = authService;
+            _db = db;   
         }
 
         // -----------------------------
@@ -28,6 +30,7 @@ namespace ApiPulseHQ.Api.Controllers
         {
             var dto = new RegisterRequestDto
             {
+                Username = request.Username,
                 Email = request.Email,
                 Password = request.Password
             };
@@ -81,9 +84,16 @@ namespace ApiPulseHQ.Api.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> Me()
         {
-            var userId = GetUserId();
-            var user = await _authService.GetCurrentUserAsync(userId);
-            return Ok(user);
+            var userId = int.Parse(User.FindFirst("userId")!.Value);
+
+            var user = await _db.Users.FindAsync(userId);
+
+            return Ok(new
+            {
+                id = user.Id,
+                username = user.Username,
+                email = user.Email
+            });
         }
 
         // -----------------------------
@@ -93,10 +103,18 @@ namespace ApiPulseHQ.Api.Controllers
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
-            var userId = GetUserId();
-            await _authService.LogoutAsync(userId);
+            var userId = int.Parse(User.FindFirst("userId")!.Value);
+
+            var user = await _db.Users.FindAsync(userId);
+
+            user.RefreshToken = null;
+            user.RefreshTokenExpiry = null;
+
+            await _db.SaveChangesAsync();
+
             return Ok(new { message = "Logged out successfully" });
         }
+
 
         // -----------------------------
         // FORGOT PASSWORD

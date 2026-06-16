@@ -30,12 +30,17 @@ namespace ApiPulseHQ.Api.Services.Auth
         public async Task<AuthResult> RegisterAsync(RegisterRequestDto request)
         {
             var email = request.Email.Trim().ToLower();
+            var username = request.Username.Trim().ToLower();
 
             if (await _db.Users.AnyAsync(u => u.Email == email))
                 return AuthResult.Fail("Email already registered");
 
+            if (await _db.Users.AnyAsync(u => u.Username == username))
+                return AuthResult.Fail("Username already taken");
+
             var user = new User
             {
+                Username = request.Username,
                 Email = email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 CreatedAt = DateTime.UtcNow
@@ -46,6 +51,7 @@ namespace ApiPulseHQ.Api.Services.Auth
 
             return AuthResult.SuccessResult();
         }
+
 
         // -----------------------------
         // LOGIN

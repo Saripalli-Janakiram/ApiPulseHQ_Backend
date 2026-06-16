@@ -6,6 +6,7 @@ namespace ApiPulseHQ.Domain.Entities
     {
         public Guid Id { get; set; }
 
+        public string Username { get; set; } = string.Empty;
         public string Email { get; set; } = default!;
 
         public string PasswordHash { get; set; } = default!;

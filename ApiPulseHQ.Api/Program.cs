@@ -23,6 +23,20 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // --------------------------------------
+// CORS (Fix for Angular + Swagger)
+// --------------------------------------
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngular", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+// --------------------------------------
 // DbContext
 // --------------------------------------
 builder.Services.AddDbContext<ApiPulseDbContext>(options =>
@@ -88,7 +102,11 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// IMPORTANT: Enable CORS BEFORE auth
+app.UseCors("AllowAngular");
+
+// IMPORTANT: Disable HTTPS redirection (Swagger breaks otherwise)
+// app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();

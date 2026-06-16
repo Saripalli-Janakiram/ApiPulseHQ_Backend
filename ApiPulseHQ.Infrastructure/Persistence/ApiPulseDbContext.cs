@@ -22,9 +22,14 @@ namespace ApiPulseHQ.Infrastructure.Persistence
         public DbSet<AlertRule> AlertRules => Set<AlertRule>();
         public DbSet<StatusPage> StatusPages => Set<StatusPage>();
         public DbSet<StatusPageService> StatusPageServices => Set<StatusPageService>();
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<User>()
+               .HasIndex(u => u.Email)
+               .IsUnique();
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Username)
+                .IsUnique();
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApiPulseDbContext).Assembly);
             base.OnModelCreating(modelBuilder);
         }
