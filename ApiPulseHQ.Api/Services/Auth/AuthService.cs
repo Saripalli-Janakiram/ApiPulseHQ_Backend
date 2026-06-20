@@ -1,5 +1,5 @@
-﻿using ApiPulseHQ.Application.Interfaces;
-using ApiPulseHQ.Application.DTOs.Auth;
+﻿using ApiPulseHQ.Application.DTOs.Auth;
+using ApiPulseHQ.Application.Interfaces;
 using ApiPulseHQ.Domain.Entities;
 using ApiPulseHQ.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -49,9 +49,8 @@ namespace ApiPulseHQ.Api.Services.Auth
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
 
-            return AuthResult.SuccessResult();
+            return AuthResult.SuccessResult("", "");
         }
-
 
         // -----------------------------
         // LOGIN
@@ -67,13 +66,15 @@ namespace ApiPulseHQ.Api.Services.Auth
             if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
                 return AuthResult.Fail("Invalid email or password");
 
+            // Generate JWT + Refresh Token
             var tokens = GenerateTokens(user);
 
+            // Save refresh token
             user.RefreshToken = tokens.RefreshToken;
             user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
             await _db.SaveChangesAsync();
 
-            return AuthResult.SuccessResult(tokens);
+            return AuthResult.SuccessResult(tokens.Token, tokens.RefreshToken);
         }
 
         // -----------------------------
@@ -92,7 +93,7 @@ namespace ApiPulseHQ.Api.Services.Auth
             user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
             await _db.SaveChangesAsync();
 
-            return AuthResult.SuccessResult(tokens);
+            return AuthResult.SuccessResult(tokens.Token, tokens.RefreshToken);
         }
 
         // -----------------------------
@@ -114,7 +115,7 @@ namespace ApiPulseHQ.Api.Services.Auth
         }
 
         // -----------------------------
-        // LOGOUT (/auth/logout)
+        // LOGOUT
         // -----------------------------
         public async Task LogoutAsync(Guid userId)
         {
@@ -138,7 +139,7 @@ namespace ApiPulseHQ.Api.Services.Auth
 
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (user == null)
-                return; // Do not reveal user existence
+                return;
 
             user.PasswordResetToken = Guid.NewGuid().ToString("N");
             user.PasswordResetExpiry = DateTime.UtcNow.AddHours(1);
@@ -187,9 +188,6 @@ namespace ApiPulseHQ.Api.Services.Auth
             var jwtSection = _config.GetSection("Jwt");
             var keyString = jwtSection["Key"];
 
-            if (string.IsNullOrWhiteSpace(keyString) || keyString.Length < 32)
-                throw new Exception("JWT Key must be at least 32 characters long.");
-
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -200,7 +198,7 @@ namespace ApiPulseHQ.Api.Services.Auth
                 signingCredentials: creds,
                 claims: new[]
                 {
-                    new Claim("userId", user.Id.ToString())
+                    new Claim("id", user.Id.ToString()) // ⭐ FIXED CLAIM
                 }
             );
 

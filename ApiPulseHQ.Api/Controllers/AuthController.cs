@@ -1,9 +1,11 @@
 ﻿using ApiPulseHQ.Api.Models.Auth;
+using ApiPulseHQ.Api.Services.Auth;
 using ApiPulseHQ.Application.DTOs.Auth;
 using ApiPulseHQ.Application.Interfaces;
+using ApiPulseHQ.Infrastructure.Persistence;        
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ApiPulseHQ.Infrastructure.Persistence;        
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -16,10 +18,12 @@ namespace ApiPulseHQ.Api.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ApiPulseDbContext _db;
-        public AuthController(IAuthService authService, ApiPulseDbContext db)
+        private readonly TokenService _tokenService;
+        public AuthController(IAuthService authService, ApiPulseDbContext db, TokenService tokenService)
         {
             _authService = authService;
-            _db = db;   
+            _db = db;
+            _tokenService = tokenService;
         }
 
         // -----------------------------
@@ -60,8 +64,19 @@ namespace ApiPulseHQ.Api.Controllers
             if (!result.Success)
                 return BadRequest(result);
 
-            return Ok(result);
+            // ⭐ IMPORTANT:
+            // result.Token MUST contain "id" claim inside the JWT
+            // otherwise /auth/me will fail
+
+            return Ok(new
+            {
+                success = true,
+                token = result.Token,
+                refreshToken = result.RefreshToken,
+                message = "Login successful"
+            });
         }
+
 
 
         // -----------------------------
@@ -84,9 +99,17 @@ namespace ApiPulseHQ.Api.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> Me()
         {
-            var userId = int.Parse(User.FindFirst("userId")!.Value);
+            var idClaim = User.FindFirst("id");
 
-            var user = await _db.Users.FindAsync(userId);
+            if (idClaim == null)
+                return Unauthorized("Token missing id claim");
+
+            var userId = Guid.Parse(idClaim.Value);
+
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return NotFound("User not found");
 
             return Ok(new
             {
@@ -96,6 +119,8 @@ namespace ApiPulseHQ.Api.Controllers
             });
         }
 
+
+
         // -----------------------------
         // LOGOUT (/auth/logout)
         // -----------------------------
@@ -103,9 +128,17 @@ namespace ApiPulseHQ.Api.Controllers
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
-            var userId = int.Parse(User.FindFirst("userId")!.Value);
+            var idClaim = User.FindFirst("id");
 
-            var user = await _db.Users.FindAsync(userId);
+            if (idClaim == null)
+                return Unauthorized("Token missing id claim");
+
+            var userId = Guid.Parse(idClaim.Value);
+
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return NotFound("User not found");
 
             user.RefreshToken = null;
             user.RefreshTokenExpiry = null;
@@ -114,6 +147,7 @@ namespace ApiPulseHQ.Api.Controllers
 
             return Ok(new { message = "Logged out successfully" });
         }
+
 
 
         // -----------------------------

@@ -11,6 +11,7 @@ using ApiPulseHQ.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,7 +21,37 @@ var builder = WebApplication.CreateBuilder(args);
 // --------------------------------------
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "ApiPulseHQ", Version = "v1" });
+
+    // ⭐ Add JWT support in Swagger
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        In = ParameterLocation.Header,
+        Description = "Enter JWT token like: Bearer {your token}",
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 // --------------------------------------
 // CORS (Fix for Angular + Swagger)
@@ -80,7 +111,7 @@ builder.Services.AddScoped<IStatusPagesService, StatusPagesService>();
 builder.Services.AddScoped<IPublicStatusPageService, PublicStatusPageService>();
 builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
-
+builder.Services.AddScoped<TokenService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<MonitoringWorker>();
 
@@ -102,11 +133,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// IMPORTANT: Enable CORS BEFORE auth
 app.UseCors("AllowAngular");
-
-// IMPORTANT: Disable HTTPS redirection (Swagger breaks otherwise)
-// app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();

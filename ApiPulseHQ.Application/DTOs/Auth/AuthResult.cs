@@ -4,14 +4,18 @@
     {
         public bool Success { get; set; }
         public string? Error { get; set; }
-        public TokenResponse? Tokens { get; set; }
 
-        public static AuthResult SuccessResult(TokenResponse? tokens = null)
+        // ⭐ Add these two properties
+        public string? Token { get; set; }
+        public string? RefreshToken { get; set; }
+
+        public static AuthResult SuccessResult(string token, string refreshToken)
         {
             return new AuthResult
             {
                 Success = true,
-                Tokens = tokens
+                Token = token,
+                RefreshToken = refreshToken
             };
         }
 
